@@ -343,7 +343,7 @@ deploy:
 
 ## 라이선스
 
-[MIT License](LICENSE)
+[Apache License](LICENSE)
 
 ---
 
