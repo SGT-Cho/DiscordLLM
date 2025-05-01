@@ -1,0 +1,57 @@
+name: Deploy Discord LLM Services
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    
+    - name: Add host key
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to server
+      run: |
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        cd ${{ secrets.PROJECT_PATH }}
+        
+        # Pull latest changes
+        git pull
+        
+        # Create environment variable files if they don't exist
+        if [ ! -f "./discord-bot/.env" ]; then
+          echo "DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}" > ./discord-bot/.env
+          echo "MCP_API=${{ secrets.MCP_API }}" >> ./discord-bot/.env
+          echo "QDRANT_URL=${{ secrets.QDRANT_URL }}" >> ./discord-bot/.env
+          echo "SEARXNG_URL=${{ secrets.SEARXNG_URL }}" >> ./discord-bot/.env
+          echo "BOT_PREFIX=${{ secrets.BOT_PREFIX }}" >> ./discord-bot/.env
+        fi
+        
+        if [ ! -f "./mcp-server/.env" ]; then
+          echo "QDRANT_URL=${{ secrets.QDRANT_URL }}" > ./mcp-server/.env
+          echo "LLAMA_SERVER_URL=${{ secrets.LLAMA_SERVER_URL }}" >> ./mcp-server/.env
+          echo "SEARXNG_URL=${{ secrets.SEARXNG_URL }}" >> ./mcp-server/.env
+        fi
+        
+        # Build and restart containers
+        docker-compose down
+        docker-compose build
+        docker-compose up -d
+        
+        # Check if services are running
+        sleep 10
+        docker-compose ps
+        EOF

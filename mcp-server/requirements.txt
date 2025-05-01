@@ -1,0 +1,13 @@
+fastapi==0.104.1
+uvicorn==0.23.2
+pydantic==2.5.2
+qdrant-client>=1.6.1
+python-dotenv==1.0.0
+httpx==0.25.2
+# Added dependencies for web scraping, embedding, and RAG
+beautifulsoup4==4.12.2
+langchain==0.1.0
+langchain-community==0.0.13
+sentence-transformers==2.2.2
+requests==2.31.0
+# Removed model-context-protocol which is not compatible
