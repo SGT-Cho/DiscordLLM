@@ -38,8 +38,8 @@ ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-3-opus-20240229')
 
 # 타임아웃 설정
-MCP_SERVER_TIMEOUT = int(os.getenv('MCP_SERVER_TIMEOUT', '300'))
-LLAMA_SERVER_TIMEOUT = int(os.getenv('LLAMA_SERVER_TIMEOUT', '120'))
+MCP_SERVER_TIMEOUT = int(os.getenv('MCP_SERVER_TIMEOUT', '600'))  # 5분에서 10분으로 증가
+LLAMA_SERVER_TIMEOUT = int(os.getenv('LLAMA_SERVER_TIMEOUT', '300'))  # 2분에서 5분으로 증가
 
 logger.info(f"Using LLM Provider: {LLM_PROVIDER}")
 if LLM_PROVIDER == 'local':
@@ -620,7 +620,7 @@ async def rag_search_endpoint(request: RagSearchRequest):
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 request_data = {
-                    "model": "gemma-3-27b-it-q4_0-gguf",
+                    "model": "gemma-3-27b-it-qat-q4_0-gguf",
                     "messages": [
                         {
                             "role": "system",

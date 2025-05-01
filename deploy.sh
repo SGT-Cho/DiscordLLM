@@ -59,9 +59,16 @@ EOL
 fi
 
 # LLM 제공자 확인
-LLM_PROVIDER=$(grep "LLM_PROVIDER" $ENV_FILE | cut -d'=' -f2 | sed 's/[[:space:]]//g' | tr -d '"' | tr -d "'")
+LLM_PROVIDER=$(grep "^LLM_PROVIDER=" $ENV_FILE | cut -d'=' -f2 | sed 's/[[:space:]]//g' | tr -d '"' | tr -d "'")
 if [ -z "$LLM_PROVIDER" ]; then
     LLM_PROVIDER="local"
+fi
+
+# LLM_PROVIDER 값 검증
+if [[ "$LLM_PROVIDER" != "local" && "$LLM_PROVIDER" != "openai" && "$LLM_PROVIDER" != "anthropic" ]]; then
+    echo -e "${RED}오류: 알 수 없는 LLM_PROVIDER 값입니다: $LLM_PROVIDER${NC}"
+    echo "LLM_PROVIDER는 local, openai, anthropic 중 하나여야 합니다."
+    exit 1
 fi
 
 # 모델 파일 확인 (local 모드일 때만)
@@ -72,41 +79,35 @@ if [ "$LLM_PROVIDER" = "local" ]; then
         mkdir -p "$MODEL_DIR"
     fi
 
-    MODEL_PATH=$(grep "MODEL_PATH" $ENV_FILE | cut -d'=' -f2)
+    MODEL_PATH=$(grep "^MODEL_PATH=" $ENV_FILE | cut -d'=' -f2)
     MODEL_FILENAME=$(basename $MODEL_PATH)
     if [ ! -f "$MODEL_DIR/$MODEL_FILENAME" ]; then
         echo -e "${YELLOW}경고: 모델 파일($MODEL_FILENAME)을 찾을 수 없습니다.${NC}"
         echo "모델 파일을 models 디렉토리에 다운로드한 후 다시 시도해주세요."
-        echo "기본 모델: gemma-3-27b-it-q4_0.gguf"
+        echo "기본 모델: gemma-3-27b-it-qat-q4_0.gguf"
         echo -e "${YELLOW}계속 진행하시겠습니까? (y/n)${NC}"
         read -r response
         if [[ "$response" =~ ^([nN][oO]|[nN])$ ]]; then
             exit 1
         fi
     fi
-else
+elif [ "$LLM_PROVIDER" = "openai" ]; then
     # 외부 LLM 사용 시 API 키 확인
-    if [ "$LLM_PROVIDER" = "openai" ]; then
-        OPENAI_API_KEY=$(grep "OPENAI_API_KEY" $ENV_FILE | cut -d'=' -f2 | sed 's/[[:space:]]//g' | tr -d '"' | tr -d "'")
-        if [ -z "$OPENAI_API_KEY" ]; then
-            echo -e "${RED}오류: OPENAI_API_KEY가 설정되지 않았습니다.${NC}"
-            echo "OpenAI API 키를 .env 파일에 설정해주세요."
-            exit 1
-        fi
-        echo -e "${GREEN}OpenAI API를 LLM 제공자로 사용합니다.${NC}"
-    elif [ "$LLM_PROVIDER" = "anthropic" ]; then
-        ANTHROPIC_API_KEY=$(grep "ANTHROPIC_API_KEY" $ENV_FILE | cut -d'=' -f2 | sed 's/[[:space:]]//g' | tr -d '"' | tr -d "'")
-        if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo -e "${RED}오류: ANTHROPIC_API_KEY가 설정되지 않았습니다.${NC}"
-            echo "Anthropic API 키를 .env 파일에 설정해주세요."
-            exit 1
-        fi
-        echo -e "${GREEN}Anthropic Claude API를 LLM 제공자로 사용합니다.${NC}"
-    else
-        echo -e "${RED}오류: 알 수 없는 LLM_PROVIDER 값입니다: $LLM_PROVIDER${NC}"
-        echo "LLM_PROVIDER는 local, openai, anthropic 중 하나여야 합니다."
+    OPENAI_API_KEY=$(grep "^OPENAI_API_KEY=" $ENV_FILE | cut -d'=' -f2 | sed 's/[[:space:]]//g' | tr -d '"' | tr -d "'")
+    if [ -z "$OPENAI_API_KEY" ]; then
+        echo -e "${RED}오류: OPENAI_API_KEY가 설정되지 않았습니다.${NC}"
+        echo "OpenAI API 키를 .env 파일에 설정해주세요."
         exit 1
     fi
+    echo -e "${GREEN}OpenAI API를 LLM 제공자로 사용합니다.${NC}"
+elif [ "$LLM_PROVIDER" = "anthropic" ]; then
+    ANTHROPIC_API_KEY=$(grep "^ANTHROPIC_API_KEY=" $ENV_FILE | cut -d'=' -f2 | sed 's/[[:space:]]//g' | tr -d '"' | tr -d "'")
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
+        echo -e "${RED}오류: ANTHROPIC_API_KEY가 설정되지 않았습니다.${NC}"
+        echo "Anthropic API 키를 .env 파일에 설정해주세요."
+        exit 1
+    fi
+    echo -e "${GREEN}Anthropic Claude API를 LLM 제공자로 사용합니다.${NC}"
 fi
 
 # Docker와 Docker Compose 설치 확인

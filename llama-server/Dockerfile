@@ -36,8 +36,8 @@ WORKDIR /app
 COPY --from=builder /app/llama.cpp/build/bin /app/bin
 COPY --from=builder /app/llama.cpp/models /app/models
 
-# Copy Python server code
-COPY --from=builder /app/llama.cpp/examples/server /app/server
+# Copy Python server code - updating path to include all llama.cpp code
+COPY --from=builder /app/llama.cpp /app/llama.cpp
 
 # Install Python dependencies directly (not using requirements file)
 RUN pip3 install 'fastapi>=0.95.2' 'uvicorn>=0.22.0' 'sse-starlette>=1.6.1' 'pydantic>=2.0' 'starlette>=0.27.0'

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration parameters (customize as needed)
-MODEL_PATH="$(pwd)/models/gemma-3-27b-it-q4_0.gguf"
+MODEL_PATH="$(pwd)/models/gemma-3-27b-it-qat-q4_0.gguf"
 THREADS=8  # Recommended for M4 Pro
 METAL_LAYERS=45  # Near maximum for 27B model on M4 Pro with enough RAM
 PORT=5602

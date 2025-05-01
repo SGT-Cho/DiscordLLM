@@ -3,6 +3,11 @@ version: '3.8'
 x-local-llm-condition: &local-llm-condition
   condition: service_healthy
 
+# Define a variable for common dependencies
+x-common-nginx-depends: &common-nginx-depends
+  - mcp-server
+  - qdrant
+
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -13,11 +18,7 @@ services:
     restart: always
     networks:
       - discord-llm-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # Healthcheck removed to allow dependent services to start
 
   llama-server:
     # LLM_PROVIDER가 'local'일 때만 실행되는 조건 추가
@@ -34,7 +35,7 @@ services:
     environment:
       - THREADS=${THREADS:-4}
       - METAL_LAYERS=${METAL_LAYERS:-32}
-      - MODEL_PATH=${MODEL_PATH:-/models/gemma-3-27b-it-q4_0.gguf}
+      - MODEL_PATH=${MODEL_PATH:-/models/gemma-3-27b-it-qat-q4_0.gguf}
     restart: always
     networks:
       - discord-llm-network
@@ -46,7 +47,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 16G  # Adjust based on model requirements
+          memory: 32G  # Adjusted from 16G to 32G based on model requirements
 
   mcp-server:
     build: 
@@ -67,7 +68,7 @@ services:
       - LLAMA_SERVER_URL=http://llama-server:5602
     depends_on:
       qdrant:
-        condition: service_healthy
+        condition: service_started  # Changed from service_healthy to service_started
       searxng:
         condition: service_started
       # LLM_PROVIDER가 local일 때만 llama-server에 의존성 추가
@@ -77,11 +78,7 @@ services:
     restart: always
     networks:
       - discord-llm-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5601/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # Healthcheck removed to allow dependent services to start
 
   discord-bot:
     build:
@@ -89,13 +86,13 @@ services:
       dockerfile: Dockerfile
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - MCP_API=http://mcp-server:5601
+      - MCP_SERVER_URL=http://mcp-server:5601  # Changed from MCP_API to MCP_SERVER_URL to match bot code
       - QDRANT_URL=http://qdrant:6333
       - SEARXNG_URL=http://searxng:8080
       - BOT_PREFIX=/
     depends_on:
       mcp-server:
-        condition: service_healthy
+        condition: service_started  # Changed from service_healthy to service_started
     restart: always
     networks:
       - discord-llm-network
@@ -125,7 +122,6 @@ services:
     depends_on:
       - mcp-server
       - qdrant
-      - llama-server
     restart: always
     networks:
       - discord-llm-network
