@@ -72,3 +72,6 @@ temp/
 
 # Build artifacts
 llama.cpp/build/
+
+# Exclude entire llama.cpp directory (large third-party library)
+llama.cpp/
