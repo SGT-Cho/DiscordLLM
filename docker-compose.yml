@@ -1,0 +1,141 @@
+version: '3.8'
+
+x-local-llm-condition: &local-llm-condition
+  condition: service_healthy
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "5600:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: always
+    networks:
+      - discord-llm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  llama-server:
+    # LLM_PROVIDER가 'local'일 때만 실행되는 조건 추가
+    profiles:
+      - local
+    build:
+      context: ./llama-server
+      dockerfile: Dockerfile
+    platform: linux/amd64  # Use x86 emulation for compatibility
+    ports:
+      - "5602:5602"
+    volumes:
+      - ./models:/models
+    environment:
+      - THREADS=${THREADS:-4}
+      - METAL_LAYERS=${METAL_LAYERS:-32}
+      - MODEL_PATH=${MODEL_PATH:-/models/gemma-3-27b-it-q4_0.gguf}
+    restart: always
+    networks:
+      - discord-llm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5602/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 16G  # Adjust based on model requirements
+
+  mcp-server:
+    build: 
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "5601:5601"
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - SEARXNG_URL=http://searxng:8080
+      # LLM 제공자 설정
+      - LLM_PROVIDER=${LLM_PROVIDER:-local}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-opus-20240229}
+      # 'local' 모드에서는 내부 llama 서버 URL 사용, 외부 모드에서는 해당 설정 무시
+      - LLAMA_SERVER_URL=http://llama-server:5602
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+      # LLM_PROVIDER가 local일 때만 llama-server에 의존성 추가
+      llama-server:
+        <<: *local-llm-condition
+        required: false
+    restart: always
+    networks:
+      - discord-llm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5601/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  discord-bot:
+    build:
+      context: ./discord-bot
+      dockerfile: Dockerfile
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - MCP_API=http://mcp-server:5601
+      - QDRANT_URL=http://qdrant:6333
+      - SEARXNG_URL=http://searxng:8080
+      - BOT_PREFIX=/
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    restart: always
+    networks:
+      - discord-llm-network
+
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "5578:8080"
+    restart: always
+    networks:
+      - discord-llm-network
+    environment:
+      - BASE_URL=http://localhost:5578/
+      - INSTANCE_NAME=DiscordLLM Search
+    volumes:
+      - searxng_data:/etc/searxng
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/nginx/certs
+    depends_on:
+      - mcp-server
+      - qdrant
+      - llama-server
+    restart: always
+    networks:
+      - discord-llm-network
+
+volumes:
+  qdrant_data:
+    driver: local
+  searxng_data:
+    driver: local
+
+networks:
+  discord-llm-network:
+    driver: bridge
