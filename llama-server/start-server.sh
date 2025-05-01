@@ -13,7 +13,23 @@ if [ ! -f "$MODEL_PATH" ]; then
 fi
 
 echo "Starting llama.cpp server with model: $MODEL_PATH"
-echo "Using $THREADS threads and $METAL_LAYERS Metal layers"
+
+# Check if MPS is available (for macOS)
+USE_MPS=0
+if [ "$(uname)" = "Darwin" ] && [ "$METAL_LAYERS" -gt 0 ]; then
+    # Check for Metal device
+    system_profiler SPDisplaysDataType 2>/dev/null | grep -q "Metal: Supported"
+    if [ $? -eq 0 ]; then
+        USE_MPS=1
+        echo "MPS (Metal Performance Shaders) acceleration detected and enabled!"
+        echo "Using $THREADS threads and $METAL_LAYERS Metal layers with MPS acceleration"
+    else
+        echo "Metal is not supported on this device, using CPU only"
+        echo "Using $THREADS threads (CPU only)"
+    fi
+else
+    echo "Using $THREADS threads and $METAL_LAYERS Metal layers"
+fi
 
 # Debug: List directories to verify binaries exist
 echo "Checking for server binaries:"
