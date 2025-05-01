@@ -75,3 +75,10 @@ llama.cpp/build/
 
 # Exclude entire llama.cpp directory (large third-party library)
 llama.cpp/
+
+# 중복 디렉토리 제외
+discord-llm/
+
+# 버전 파일 제외
+=*.*.*
+=*.*
